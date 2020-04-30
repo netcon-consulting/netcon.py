@@ -1,4 +1,4 @@
-# netcon.py V1.0.0
+# netcon.py V1.1.0
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -40,16 +40,41 @@ class ParserEmailLog(argparse.ArgumentParser):
         self.add_argument("email", metavar="EMAIL", type=str, help="email file to check")
         self.add_argument("log", metavar="LOG", type=str, help="file for log output")
 
-def read_file(path_file):
+class ParserConfig(argparse.ArgumentParser):
+    """
+    Argument parser for config.
+    """
+    def __init__(self, description, config_default):
+        """
+        :type description: str
+        :type config_default: str
+        """
+        super().__init__(description=description)
+
+        self.add_argument(
+            "-c",
+            "--config",
+            metavar="CONFIG",
+            type=str,
+            default=config_default,
+            help="path to configuration file (default={})".format(config_default)
+        )
+
+def read_file(path_file, ignore_errors=False):
     """
     Read file as string.
 
     :type path_file: str
+    :type ignore_errors: bool
     :rtype: str
     """
     try:
-        with open(path_file) as f:
-            content = f.read()
+        if ignore_errors:
+            with open(path_file, errors="ignore") as f:
+                content = f.read()
+        else:
+            with open(path_file) as f:
+                content = f.read()
     except FileNotFoundError:
         raise Exception("'{}' does not exist".format(path_file))
     except PermissionError:
