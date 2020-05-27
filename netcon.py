@@ -1,4 +1,4 @@
-# netcon.py V1.1.0
+# netcon.py V1.1.1
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -124,7 +124,7 @@ def read_config(path_config, parameters_config):
     if parameters_missing:
         raise Exception("Missing parameters {}".format(str(parameters_missing)[1:-1]))
 
-    TupleConfig = namedtuple('TupleConfig', parameters_config)
+    TupleConfig = namedtuple("TupleConfig", parameters_config)
 
     return TupleConfig(**config)
 
@@ -196,7 +196,7 @@ def get_address_list(name_list, last_config="/var/cs-gateway/deployments/lastApp
     """
     parser = make_parser()
     address_handler = HandlerAddressList(name_list)
-    parser.setContentHandler(handler)
+    parser.setContentHandler(address_handler)
 
     try:
         parser.parse(last_config)
