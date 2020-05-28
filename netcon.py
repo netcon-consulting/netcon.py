@@ -1,4 +1,4 @@
-# netcon.py V1.1.1
+# netcon.py V1.1.2
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -59,6 +59,51 @@ class ParserConfig(argparse.ArgumentParser):
             default=config_default,
             help="path to configuration file (default={})".format(config_default)
         )
+
+class SAXExceptionFinished(SAXException):
+    """
+    Custom SAXException for stopping parsing after all info has been read.
+    """
+    def __init__(self):
+        super().__init__("Stop parsing")
+
+class HandlerAddressList(handler.ContentHandler):
+    """
+    Custom content handler for xml.sax for extracting address list from CS config.
+    """
+    def __init__(self, name_list):
+        """
+        :type name_list: str
+        """
+        self.name_list = name_list
+        self.set_address = set()
+        self.list_found = False
+        self.add_address = False
+
+        super().__init__()
+
+    def startElement(self, name, attrs):
+        if not self.add_address:
+            if name == "AddressList" and "name" in attrs and attrs["name"] == self.name_list:
+                self.list_found = True
+            elif self.list_found and name == "Address":
+                self.add_address = True
+
+    def characters(self, content):
+        if self.add_address:
+            self.set_address.add(content)
+
+    def endElement(self, name):
+        if self.list_found and (name == "AddressList"):
+            raise SAXExceptionFinished
+
+    def getAddresses(self):
+        """
+        Return email addresses as set.
+
+        :rtype: set
+        """
+        return self.set_address
 
 def read_file(path_file, ignore_errors=False):
     """
@@ -140,51 +185,6 @@ def write_log(path_log, message):
 
     with open(path_log, "a") as file_log:
         file_log.write("{}{}{}\n".format(LOG_PREFIX, message, LOG_SUFFIX))
-
-class SAXExceptionFinished(SAXException):
-    """
-    Custom SAXException for stopping parsing after all info has been read.
-    """
-    def __init__(self):
-        super().__init__("Stop parsing")
-
-class HandlerAddressList(handler.ContentHandler):
-    """
-    Custom content handler for xml.sax for extracting address list from CS config.
-    """
-    def __init__(self, name_list):
-        """
-        :type name_list: str
-        """
-        self.name_list = name_list
-        self.set_address = set()
-        self.list_found = False
-        self.add_address = False
-
-        super().__init__()
-
-    def startElement(self, name, attrs):
-        if not self.add_address:
-            if (name == "AddressList") and ("name" in attrs) and (attrs["name"] == self.name_list):
-                self.list_found = True
-            elif self.list_found:
-                self.add_address = True
-
-    def characters(self, content):
-        if self.add_address:
-            self.set_address.add(content)
-
-    def endElement(self, name):
-        if self.list_found and (name == "AddressList"):
-            raise SAXExceptionFinished
-
-    def getAddresses(self):
-        """
-        Return email addresses as set.
-
-        :rtype: set
-        """
-        return self.set_address
 
 def get_address_list(name_list, last_config="/var/cs-gateway/deployments/lastAppliedConfiguration.xml"):
     """
