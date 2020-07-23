@@ -1,4 +1,4 @@
-# netcon.py V1.1.2
+# netcon.py V1.2.0
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -15,6 +15,7 @@ from io import BytesIO
 import re
 import toml
 import pyzipper
+from bs4 import BeautifulSoup
 
 PATTERN_EMAIL_ADDRESS = re.compile(r'.*?([^<",;\s]+@[^>",;\s]+)', re.A)
 
@@ -104,6 +105,38 @@ class HandlerAddressList(handler.ContentHandler):
         :rtype: set
         """
         return self.set_address
+
+class HandlerExpressionList(handler.ContentHandler):
+    """
+    Custom content handler for xml.sax for extracting expression list from CS config.
+    """
+    def __init__(self, name_list):
+        """
+        :type name_list: str
+        """
+        self.name_list = name_list
+        self.set_expression = set()
+        self.list_found = False
+
+        super().__init__()
+
+    def startElement(self, name, attrs):
+        if name == "TextualAnalysis" and "name" in attrs and attrs["name"] == self.name_list:
+            self.list_found = True
+        elif self.list_found and name == "Phrase" and "text" in attrs:
+            self.set_expression.add(attrs["text"])
+
+    def endElement(self, name):
+        if self.list_found and (name == "TextualAnalysis"):
+            raise SAXExceptionFinished
+
+    def getExpressions(self):
+        """
+        Return expressions as set.
+
+        :rtype: set
+        """
+        return self.set_expression
 
 def read_file(path_file, ignore_errors=False):
     """
@@ -205,6 +238,25 @@ def get_address_list(name_list, last_config="/var/cs-gateway/deployments/lastApp
 
     return address_handler.getAddresses()
 
+def get_expression_list(name_list, last_config="/var/cs-gateway/deployments/lastAppliedConfiguration.xml"):
+    """
+    Extract expression list from CS config and return expressions as set.
+
+    :type name_list: str
+    :type last_config: str
+    :rtype: set
+    """
+    parser = make_parser()
+    expression_handler = HandlerExpressionList(name_list)
+    parser.setContentHandler(expression_handler)
+
+    try:
+        parser.parse(last_config)
+    except SAXExceptionFinished:
+        pass
+
+    return expression_handler.getExpressions()
+
 def zip_encrypt(set_data, password):
     """
     Create encrypted zip archive from set of data with defined password and return as bytes.
@@ -268,3 +320,26 @@ def extract_email_address(string):
         return email_address.group(1)
 
     return None
+
+def html2text(html, strip=True):
+    """
+    Extract text from html.
+
+    :type html: str
+    :rtype: str
+    """
+    soup = BeautifulSoup(html, features="html5lib")
+
+    for script in soup([ "script", "style" ]):
+        script.extract()
+
+    text = soup.get_text()
+
+    if strip:
+        lines = ( line.strip() for line in text.splitlines() )
+
+        chunks = ( phrase.strip() for line in lines for phrase in line.split("  ") )
+
+        text = "\n".join( chunk for chunk in chunks if chunk )
+
+    return text
