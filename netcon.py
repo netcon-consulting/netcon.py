@@ -1,10 +1,10 @@
-# netcon.py V1.2.0
+# netcon.py V2.0.0
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
 
 """
-Collection of functions.
+Collection of functions for Clearswift external commands.
 """
 
 import argparse
@@ -17,49 +17,31 @@ import toml
 import pyzipper
 from bs4 import BeautifulSoup
 
-PATTERN_EMAIL_ADDRESS = re.compile(r'.*?([^<",;\s]+@[^>",;\s]+)', re.A)
+PATTERN_EMAIL_ADDRESS = re.compile(r'.*?([^<",;\s]+@[^>",;\s]+)')
 
-class ParserEmailLog(argparse.ArgumentParser):
+class ParserArgs(argparse.ArgumentParser):
     """
-    Argument parser for email and log file.
+    Argument parser for config, input and log files.
     """
-    def __init__(self, description, config_default):
+    def __init__(self, description, config_default=None):
         """
         :type description: str
         :type config_default: str
         """
         super().__init__(description=description)
 
-        self.add_argument(
-            "-c",
-            "--config",
-            metavar="CONFIG",
-            type=str,
-            default=config_default,
-            help="path to configuration file (default={})".format(config_default)
-        )
-        self.add_argument("email", metavar="EMAIL", type=str, help="email file to check")
-        self.add_argument("log", metavar="LOG", type=str, help="file for log output")
+        if config_default is not None:
+            self.add_argument(
+                "-c",
+                "--config",
+                metavar="CONFIG",
+                type=str,
+                default=config_default,
+                help="path to configuration file (default={})".format(config_default)
+            )
 
-class ParserConfig(argparse.ArgumentParser):
-    """
-    Argument parser for config.
-    """
-    def __init__(self, description, config_default):
-        """
-        :type description: str
-        :type config_default: str
-        """
-        super().__init__(description=description)
-
-        self.add_argument(
-            "-c",
-            "--config",
-            metavar="CONFIG",
-            type=str,
-            default=config_default,
-            help="path to configuration file (default={})".format(config_default)
-        )
+        self.add_argument("input", metavar="INPUT", type=str, help="input file")
+        self.add_argument("log", metavar="LOG", type=str, help="log file")
 
 class SAXExceptionFinished(SAXException):
     """
@@ -326,6 +308,7 @@ def html2text(html, strip=True):
     Extract text from html.
 
     :type html: str
+    :type strip: bool
     :rtype: str
     """
     soup = BeautifulSoup(html, features="html5lib")
