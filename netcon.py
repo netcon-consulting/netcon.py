@@ -1,4 +1,4 @@
-# netcon.py V2.1.0
+# netcon.py V2.1.1
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -298,7 +298,7 @@ def extract_addresses(string, discard_unparsable=True):
     :type discard_unparsable: bool
     :rtype: list
     """
-    PATTERN_WITH_BRACKETS = re.compile(r'(.*?<)([^<",;\s]+@[^>",;\s]+>)(>.*)')
+    PATTERN_WITH_BRACKETS = re.compile(r'(.*?<)([^<",;\s]+@[^>",;\s]+)(>.*)')
     PATTERN_NO_BRACKETS = re.compile(r'(.*?)([^<",;\s]+@[^>",;\s]+)(.*)')
     PATTERN_QUOTE = re.compile(r'"')
 
