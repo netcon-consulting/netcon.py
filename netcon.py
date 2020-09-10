@@ -1,4 +1,4 @@
-# netcon.py V2.1.1
+# netcon.py V2.1.2
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -9,7 +9,7 @@ Collection of functions for Clearswift external commands.
 
 import argparse
 from collections import namedtuple
-from email import message_from_string
+from email import message_from_binary_file
 from xml.sax import make_parser, handler, SAXException
 from io import BytesIO
 import re
@@ -144,15 +144,14 @@ def read_file(path_file, ignore_errors=False):
 
 def read_email(path_email):
     """
-    Read email file and parse contents.
+    Parse email file.
 
     :type path_email: str
     :rtype: email.message.Message
     """
-    email = read_file(path_email)
-
     try:
-        email = message_from_string(email)
+        with open(path_email, "rb") as f:
+            email = message_from_binary_file(f)
     except:
         raise Exception("Cannot parse email")
 
