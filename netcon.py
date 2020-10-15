@@ -1,4 +1,4 @@
-# netcon.py V2.1.2
+# netcon.py V2.2.0
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -409,3 +409,17 @@ def html2text(html, strip=True):
         text = "\n".join( chunk for chunk in chunks if chunk )
 
     return text
+
+def string_ascii(string):
+    """
+    Check whether string is ASCII.
+
+    :type string: str
+    :rtype: bool
+    """
+    try:
+        string.encode("ascii")
+    except UnicodeEncodeError:
+        return False
+
+    return True
