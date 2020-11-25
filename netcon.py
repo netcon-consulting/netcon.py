@@ -1,4 +1,4 @@
-# netcon.py V2.2.0
+# netcon.py V2.3.0
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -16,6 +16,8 @@ import re
 import toml
 import pyzipper
 from bs4 import BeautifulSoup
+
+CHARSET_UTF8 = "utf-8"
 
 class ParserArgs(argparse.ArgumentParser):
     """
