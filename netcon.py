@@ -1,4 +1,4 @@
-# netcon.py V2.3.0
+# netcon.py V2.4.0
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -8,6 +8,7 @@ Collection of functions for Clearswift external commands.
 """
 
 import argparse
+import enum
 from collections import namedtuple
 from email import message_from_binary_file
 from xml.sax import make_parser, handler, SAXException
@@ -19,29 +20,16 @@ from bs4 import BeautifulSoup
 
 CHARSET_UTF8 = "utf-8"
 
-class ParserArgs(argparse.ArgumentParser):
+@enum.unique
+class ListType(enum.IntEnum):
     """
-    Argument parser for config, input and log files.
+    List type.
     """
-    def __init__(self, description, config_default=None):
-        """
-        :type description: str
-        :type config_default: str
-        """
-        super().__init__(description=description)
-
-        if config_default is not None:
-            self.add_argument(
-                "-c",
-                "--config",
-                metavar="CONFIG",
-                type=str,
-                default=config_default,
-                help="path to configuration file (default={})".format(config_default)
-            )
-
-        self.add_argument("input", metavar="INPUT", type=str, help="input file")
-        self.add_argument("log", metavar="LOG", type=str, help="log file")
+    ADDRESS = 0
+    CONNECTION = 1
+    FILENAME = 2
+    URL = 3
+    LEXICAL = 4
 
 class SAXExceptionFinished(SAXException):
     """
@@ -50,75 +38,167 @@ class SAXExceptionFinished(SAXException):
     def __init__(self):
         super().__init__("Stop parsing")
 
-class HandlerAddressList(handler.ContentHandler):
+class HandlerBase(handler.ContentHandler):
     """
-    Custom content handler for xml.sax for extracting address list from CS config.
+    Base class of custom content handler for xml.sax for extracting lists from CS config filtered by regex matches on list name and item.
     """
-    def __init__(self, name_list):
+    def __init__(self, tag_table, tag_list, tag_item, regex_list, regex_item):
         """
-        :type name_list: str
+        :type tag_table: str
+        :type tag_list: str
+        :type tag_item: str
+        :type regex_list: str
+        :type regex_item: str
         """
-        self.name_list = name_list
-        self.set_address = set()
-        self.list_found = False
-        self.add_address = False
+        self.tag_table = tag_table
+        self.tag_list = tag_list
+        self.tag_item = tag_item
+        self.pattern_list = re.compile(regex_list)
+        self.pattern_item = re.compile(regex_item)
+        self.list_itemlist = list()
+        self.name_list = None
+        self.list_item = None
 
         super().__init__()
 
+    def getLists(self):
+        """
+        Return list of item lists.
+
+        :rtype: list
+        """
+        return self.list_itemlist
+
+class HandlerValue(HandlerBase):
+    """
+    Custom content handler for lists stored in tag values.
+    """
+    def __init__(self, tag_table, tag_list, tag_item, regex_list, regex_item):
+        """
+        :type tag_table: str
+        :type tag_list: str
+        :type tag_item: str
+        :type regex_list: str
+        :type regex_item: str
+        """
+        self.add_item = False
+
+        super().__init__(tag_table, tag_list, tag_item, regex_list, regex_item)
+
     def startElement(self, name, attrs):
-        if not self.add_address:
-            if name == "AddressList" and "name" in attrs and attrs["name"] == self.name_list:
-                self.list_found = True
-            elif self.list_found and name == "Address":
-                self.add_address = True
+        if not self.add_item:
+            if name == self.tag_list and "name" in attrs:
+                name_list = attrs["name"]
+
+                if re.search(self.pattern_list, name_list):
+                    self.name_list = name_list
+            elif self.name_list is not None and name == self.tag_item:
+                self.list_item = list()
+                self.add_item = True
 
     def characters(self, content):
-        if self.add_address:
-            self.set_address.add(content)
+        if self.add_item:
+            if re.search(self.pattern_item, content):
+                self.list_item.append(content)
 
     def endElement(self, name):
-        if self.list_found and (name == "AddressList"):
+        if name == self.tag_list and self.add_item:
+            if self.list_item:
+                self.list_itemlist.append(( self.name_list, self.list_item ))
+
+            self.name_list = None
+            self.add_item = False
+        elif name == self.tag_table:
             raise SAXExceptionFinished
 
-    def getAddresses(self):
-        """
-        Return email addresses as set.
-
-        :rtype: set
-        """
-        return self.set_address
-
-class HandlerExpressionList(handler.ContentHandler):
+class HandlerAttribute(HandlerBase):
     """
-    Custom content handler for xml.sax for extracting expression list from CS config.
+    Custom content handler for lists stored in tag attributes.
     """
-    def __init__(self, name_list):
+    def __init__(self, tag_attribute, tag_table, tag_list, tag_item, regex_list, regex_item):
         """
-        :type name_list: str
+        :type tag_attribute: str
+        :type tag_table: str
+        :type tag_list: str
+        :type tag_item: str
+        :type regex_list: str
+        :type regex_item: str
         """
-        self.name_list = name_list
-        self.set_expression = set()
-        self.list_found = False
+        self.tag_attribute = tag_attribute
 
-        super().__init__()
+        super().__init__(tag_table, tag_list, tag_item, regex_list, regex_item)
 
     def startElement(self, name, attrs):
-        if name == "TextualAnalysis" and "name" in attrs and attrs["name"] == self.name_list:
-            self.list_found = True
-        elif self.list_found and name == "Phrase" and "text" in attrs:
-            self.set_expression.add(attrs["text"])
+        if name == self.tag_list and "name" in attrs:
+            name_list = attrs["name"]
+
+            if re.search(self.pattern_list, name_list):
+                self.name_list = name_list
+                self.list_item = list()
+        elif self.name_list is not None and name == self.tag_item and self.tag_attribute in attrs:
+            item = attrs[self.tag_attribute]
+
+            if re.search(self.pattern_item, item):
+                self.list_item.append(item)
 
     def endElement(self, name):
-        if self.list_found and (name == "TextualAnalysis"):
+        if name == self.tag_list and self.name_list is not None:
+            if self.list_item:
+                self.list_itemlist.append(( self.name_list, self.list_item ))
+
+            self.name_list = None
+        elif name == self.tag_table:
             raise SAXExceptionFinished
 
-    def getExpressions(self):
-        """
-        Return expressions as set.
+def get_list(list_type, regex_list=".*", regex_item=".*", last_config="/var/cs-gateway/deployments/lastAppliedConfiguration.xml"):
+    """
+    Extract address lists from CS config filtered by regex matches on list name and item.
 
-        :rtype: set
-        """
-        return self.set_expression
+    :type list_type: ListType
+    :type regex_list: str
+    :type regex_item: str
+    :type last_config: str
+    :rtype: list
+    """
+
+    if (list_type == ListType.ADDRESS):
+        address_handler = HandlerValue("AddressListTable", "AddressList", "Address", regex_list, regex_item)
+    elif (list_type == ListType.CONNECTION):
+        address_handler = HandlerValue("TLSEndPointCollection", "TLSEndPoint", "Host", regex_list, regex_item)
+    elif (list_type == ListType.FILENAME):
+        address_handler = HandlerValue("FilenameListTable", "FilenameList", "Filename", regex_list, regex_item)
+    elif (list_type == ListType.URL):
+        address_handler = HandlerValue("UrlListTable", "UrlList", "Url", regex_list, regex_item)
+    elif (list_type == ListType.LEXICAL):
+        address_handler = HandlerAttribute("text", "TextualAnalysisCollection", "TextualAnalysis", "Phrase", regex_list, regex_item)
+
+    parser = make_parser()
+    parser.setContentHandler(address_handler)
+
+    try:
+        parser.parse(last_config)
+    except SAXExceptionFinished:
+        pass
+
+    return address_handler.getLists()
+
+def get_address_list(name_list):
+    """
+    Extract address list from CS config and return addresses as set.
+
+    :type name_list: str
+    :rtype: set
+    """
+    return { item for list_item in get_list(ListType.ADDRESS, regex_list="^{}$".format(name_list)) for item in list_item }
+
+def get_expression_list(name_list):
+    """
+    Extract expression list from CS config and return expressions as set.
+
+    :type name_list: str
+    :rtype: set
+    """
+    return { item for list_item in get_list(ListType.LEXICAL, regex_list="^{}$".format(name_list)) for item in list_item }
 
 def read_file(path_file, ignore_errors=False):
     """
@@ -199,44 +279,6 @@ def write_log(path_log, message):
 
     with open(path_log, "a") as file_log:
         file_log.write("{}{}{}\n".format(LOG_PREFIX, message, LOG_SUFFIX))
-
-def get_address_list(name_list, last_config="/var/cs-gateway/deployments/lastAppliedConfiguration.xml"):
-    """
-    Extract address list from CS config and return addresses as set.
-
-    :type name_list: str
-    :type last_config: str
-    :rtype: set
-    """
-    parser = make_parser()
-    address_handler = HandlerAddressList(name_list)
-    parser.setContentHandler(address_handler)
-
-    try:
-        parser.parse(last_config)
-    except SAXExceptionFinished:
-        pass
-
-    return address_handler.getAddresses()
-
-def get_expression_list(name_list, last_config="/var/cs-gateway/deployments/lastAppliedConfiguration.xml"):
-    """
-    Extract expression list from CS config and return expressions as set.
-
-    :type name_list: str
-    :type last_config: str
-    :rtype: set
-    """
-    parser = make_parser()
-    expression_handler = HandlerExpressionList(name_list)
-    parser.setContentHandler(expression_handler)
-
-    try:
-        parser.parse(last_config)
-    except SAXExceptionFinished:
-        pass
-
-    return expression_handler.getExpressions()
 
 def zip_encrypt(set_data, password):
     """
