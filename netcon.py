@@ -1,4 +1,4 @@
-# netcon.py V2.4.1
+# netcon.py V3.0.0
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -30,6 +30,22 @@ class ListType(enum.IntEnum):
     FILENAME = 2
     URL = 3
     LEXICAL = 4
+
+class ParserArgs(argparse.ArgumentParser):
+    """
+    Argument parser for input and log files and config name.
+    """
+    def __init__(self, description, config=False):
+        """
+        :type description: str
+        :type config: bool
+        """
+        super().__init__(description=description)
+
+        self.add_argument("input", metavar="INPUT", type=str, help="input file")
+        self.add_argument("log", metavar="LOG", type=str, help="log file")
+        if config:
+            self.add_argument("config", metavar="CONFIG", type=str, help="name of config lexical list")
 
 class SAXExceptionFinished(SAXException):
     """
@@ -239,20 +255,26 @@ def read_email(path_email):
 
     return email
 
-def read_config(path_config, parameters_config):
+def get_config(name_list, parameters_config):
     """
-    Read config file and check all required config parameters are defined.
+    Extract config parameters from CS lexical list and check all required parameters are defined.
 
-    :type path_config: str
+    :type name_list: str
     :type parameters_config: set
     :rtype: namedtuple
     """
-    config = read_file(path_config)
+    try:
+        list_config = get_expression_list(name_list)
+    except:
+        raise Exception("Cannot extract config")
+
+    if not list_config:
+        raise Exception("Cannot find config '{}'".format(name_list))
 
     try:
-        config = toml.loads(config)
+        config = toml.loads("\n".join(list_config))
     except:
-        raise Exception("Cannot parse config")
+        raise Exception("Config not valid TOML format")
 
     # discard all parameters not defined in parameters_config
     config = { param_key: param_value for (param_key, param_value) in config.items() if param_key in parameters_config }
