@@ -1,4 +1,4 @@
-# netcon.py V2.4.1
+# netcon.py V2.4.2
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -30,6 +30,30 @@ class ListType(enum.IntEnum):
     FILENAME = 2
     URL = 3
     LEXICAL = 4
+
+class ParserArgs(argparse.ArgumentParser):
+    """
+    Argument parser for config, input and log files.
+    """
+    def __init__(self, description, config_default=None):
+        """
+        :type description: str
+        :type config_default: str
+        """
+        super().__init__(description=description)
+
+        if config_default is not None:
+            self.add_argument(
+                "-c",
+                "--config",
+                metavar="CONFIG",
+                type=str,
+                default=config_default,
+                help="path to configuration file (default={})".format(config_default)
+            )
+
+        self.add_argument("input", metavar="INPUT", type=str, help="input file")
+        self.add_argument("log", metavar="LOG", type=str, help="log file")
 
 class SAXExceptionFinished(SAXException):
     """
