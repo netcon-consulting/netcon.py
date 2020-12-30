@@ -1,4 +1,4 @@
-# netcon.py V2.4.0
+# netcon.py V2.4.1
 #
 # Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -189,7 +189,7 @@ def get_address_list(name_list):
     :type name_list: str
     :rtype: set
     """
-    return { item for list_item in get_list(ListType.ADDRESS, regex_list="^{}$".format(name_list)) for item in list_item }
+    return { item for (_, list_item) in get_list(ListType.ADDRESS, regex_list="^{}$".format(name_list)) for item in list_item }
 
 def get_expression_list(name_list):
     """
@@ -198,7 +198,7 @@ def get_expression_list(name_list):
     :type name_list: str
     :rtype: set
     """
-    return { item for list_item in get_list(ListType.LEXICAL, regex_list="^{}$".format(name_list)) for item in list_item }
+    return { item for (_, list_item) in get_list(ListType.LEXICAL, regex_list="^{}$".format(name_list)) for item in list_item }
 
 def read_file(path_file, ignore_errors=False):
     """
