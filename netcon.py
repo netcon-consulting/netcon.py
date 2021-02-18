@@ -1,6 +1,6 @@
-# netcon.py V3.0.0
+# netcon.py V3.1.0
 #
-# Copyright (c) 2020 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
+# Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
 
 """
@@ -14,11 +14,14 @@ from email import message_from_binary_file
 from xml.sax import make_parser, handler, SAXException
 from io import BytesIO
 import re
+from subprocess import run, PIPE, DEVNULL
+from socket import socket, AF_INET, SOCK_STREAM
 import toml
 import pyzipper
 from bs4 import BeautifulSoup
 
 CHARSET_UTF8 = "utf-8"
+BUFFER_TCP = 4096 # in bytes
 
 @enum.unique
 class ListType(enum.IntEnum):
@@ -489,3 +492,96 @@ def string_ascii(string):
         return False
 
     return True
+
+def scan_sophos(path_file):
+    """
+    Scan file with Sophos AV and return name of virus found or None if clean.
+
+    :type path_file: str
+    :rtype: str or None
+    """
+    RUN_SOPHOS = [ "/opt/cs-gateway/bin/sophos/savfiletest", "-v", "-f" ]
+
+    try:
+        result = run(RUN_SOPHOS + [ path_file, ], check=True, stdout=PIPE, stderr=DEVNULL, encoding=CHARSET_UTF8)
+    except:
+        raise Exception("Error calling Sophos AV")
+
+    match = re.search(r"\n\tSophosConnection::recvLine returning VIRUS (\S+) {}\n".format(path_file), result.stdout)
+
+    if match:
+        return match.group(1)
+
+    return None
+
+def scan_kaspersky(path_file):
+    """
+    Scan file with Kaspersky AV and return name of virus found or None if clean.
+
+    :type path_file: str
+    :rtype: str or None
+    """
+    RUN_KASPERSKY = [ "/opt/cs-gateway/bin/kav/kavfiletest", "/tmp/.kavcom1", "/tmp/.kavscan1", "/tmp/.kavevent1" ]
+
+    try:
+        result = run(RUN_KASPERSKY + [ path_file, ], check=True, stdout=PIPE, stderr=DEVNULL, encoding=CHARSET_UTF8)
+    except:
+        raise Exception("Error calling Kaspersky AV")
+
+    match = re.search(r"\n'{}': EVENT_DETECT '([^']+)'. Detect type: ".format(path_file), result.stdout)
+
+    if match:
+        return match.group(1)
+
+    return None
+
+def avira_set(option_key, option_value, socket_avira):
+    """
+    Set Avira option.
+
+    :type option_key: str
+    :type option_value: str
+    :type socket_avira: socket
+    """
+    bytes_key = option_key.encode(CHARSET_UTF8)
+    bytes_value = option_value.encode(CHARSET_UTF8)
+
+    socket_avira.send(b"SET " + bytes_key + b" " + bytes_value + b"\n")
+
+    data = socket_avira.recv(BUFFER_TCP)
+
+    if data != b"100 " + bytes_key + b":" + bytes_value + b"\n":
+        raise Exception("Cannot set Avira option '' to value ''".format(option_key, option_value))
+
+def scan_avira(path_file):
+    """
+    Scan file with Avira AV and return name of virus found or None if clean.
+
+    :type path_file: str
+    :rtype: str or None
+    """
+    try:
+        with socket(AF_INET, SOCK_STREAM) as s:
+            s.connect(( "127.0.0.1", 9999 ))
+
+            data = s.recv(BUFFER_TCP)
+
+            if data != b"100 SAVAPI:4.0\n":
+                raise Exception
+
+            avira_set("PRODUCT", "11906", s)
+            avira_set("SCAN_TIMEOUT", "300", s)
+            avira_set("ARCHIVE_SCAN", "1", s)
+
+            s.send(b"SCAN " + path_file.encode(CHARSET_UTF8) + b"\n")
+
+            data = s.recv(BUFFER_TCP)
+    except:
+        raise Exception("Error calling Avira AV")
+
+    match = re.search(r"^310 [^;]*?(\S+) ;", data.decode(CHARSET_UTF8))
+
+    if match:
+        return match.group(1)
+
+    return None
