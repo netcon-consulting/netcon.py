@@ -1,4 +1,4 @@
-# netcon.py V3.1.0
+# netcon.py V3.2.0
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -19,9 +19,18 @@ from socket import socket, AF_INET, SOCK_STREAM
 import toml
 import pyzipper
 from bs4 import BeautifulSoup
+from dns.resolver import resolve
 
 CHARSET_UTF8 = "utf-8"
 BUFFER_TCP = 4096 # in bytes
+
+TupleReputation = namedtuple("TupleReputation", "query_domain record_type match")
+
+LIST_REPUTATION = [
+    TupleReputation(query_domain="dnsbl7.mailshell.net", record_type="A", match=re.compile(r"^((25[0-5]|2[0-4][0-9]|1?[0-9]{1,2})\.){3}(((?!100|101)[0-9])+)$")),
+    TupleReputation(query_domain="multi.surbl.org", record_type="TXT", match=re.compile(r"^(((?!Query Refused).)+)$")),
+    TupleReputation(query_domain="multi.uribl.com", record_type="TXT", match=re.compile(r"^(((?!Query Refused).)+)$")),
+]
 
 @enum.unique
 class ListType(enum.IntEnum):
@@ -179,7 +188,6 @@ def get_list(list_type, regex_list=".*", regex_item=".*", last_config="/var/cs-g
     :type last_config: str
     :rtype: list
     """
-
     if (list_type == ListType.ADDRESS):
         address_handler = HandlerValue("AddressListTable", "AddressList", "Address", regex_list, regex_item)
     elif (list_type == ListType.CONNECTION):
@@ -203,7 +211,7 @@ def get_list(list_type, regex_list=".*", regex_item=".*", last_config="/var/cs-g
 
 def get_address_list(name_list):
     """
-    Extract address list from CS config and return addresses as set.
+    Extract address list from CS config and return as set.
 
     :type name_list: str
     :rtype: set
@@ -212,12 +220,21 @@ def get_address_list(name_list):
 
 def get_expression_list(name_list):
     """
-    Extract expression list from CS config and return expressions as set.
+    Extract expression list from CS config and return as set.
 
     :type name_list: str
     :rtype: set
     """
     return { item for (_, list_item) in get_list(ListType.LEXICAL, regex_list="^{}$".format(name_list)) for item in list_item }
+
+def get_url_list(name_list):
+    """
+    Extract URL list from CS config and return as set.
+
+    :type name_list: str
+    :rtype: set
+    """
+    return { item for (_, list_item) in get_list(ListType.URL, regex_list="^{}$".format(name_list)) for item in list_item }
 
 def read_file(path_file, ignore_errors=False):
     """
@@ -583,5 +600,23 @@ def scan_avira(path_file):
 
     if match:
         return match.group(1)
+
+    return None
+
+def domain_blacklisted(domain):
+    """
+    Check domain against reputation blacklists.
+
+    :type domain: str
+    :rtype: str or None
+    """
+    for reputation in LIST_REPUTATION:
+        try:
+            set_result = { str(item) for item in resolve("{}.{}".format(domain, reputation.query_domain), reputation.record_type).rrset.items }
+        except:
+            set_result = set()
+
+        if len(set_result) == 1 and re.search(reputation.match, set_result.pop()):
+            return reputation.query_domain
 
     return None
