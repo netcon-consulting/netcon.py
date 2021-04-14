@@ -1,4 +1,4 @@
-# netcon.py V3.2.0
+# netcon.py V3.3.0
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -31,6 +31,10 @@ LIST_REPUTATION = [
     TupleReputation(query_domain="multi.surbl.org", record_type="TXT", match=re.compile(r"^(((?!Query Refused).)+)$")),
     TupleReputation(query_domain="multi.uribl.com", record_type="TXT", match=re.compile(r"^(((?!Query Refused).)+)$")),
 ]
+
+CHARSET_EQUIVALENT = {
+    "windows-31j": "cp932",
+}
 
 @enum.unique
 class ListType(enum.IntEnum):
@@ -620,3 +624,18 @@ def domain_blacklisted(domain):
             return reputation.query_domain
 
     return None
+
+def python_charset(charset):
+    """
+    Convert charset name unsupported by Python to equivalent charset name supported by Python.
+
+    :type charset: str
+    :rtype: str
+    """
+    if charset is not None:
+        lower = charset.lower()
+
+        if lower in CHARSET_EQUIVALENT:
+            return CHARSET_EQUIVALENT[lower]
+
+    return charset
