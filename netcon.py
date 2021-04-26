@@ -1,4 +1,4 @@
-# netcon.py V3.3.0
+# netcon.py V3.4.0
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -10,7 +10,7 @@ Collection of functions for Clearswift external commands.
 import argparse
 import enum
 from collections import namedtuple
-from email import message_from_binary_file
+from email import message_from_binary_file, policy
 from xml.sax import make_parser, handler, SAXException
 from io import BytesIO
 import re
@@ -273,7 +273,7 @@ def read_email(path_email):
     """
     try:
         with open(path_email, "rb") as f:
-            email = message_from_binary_file(f)
+            email = message_from_binary_file(f, policy=policy.default)
     except:
         raise Exception("Cannot parse email")
 
