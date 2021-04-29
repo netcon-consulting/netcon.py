@@ -1,4 +1,4 @@
-# netcon.py V3.4.0
+# netcon.py V3.4.1
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -273,7 +273,7 @@ def read_email(path_email):
     """
     try:
         with open(path_email, "rb") as f:
-            email = message_from_binary_file(f, policy=policy.default)
+            email = message_from_binary_file(f, policy=policy.default.clone(refold_source="none"))
     except:
         raise Exception("Cannot parse email")
 
