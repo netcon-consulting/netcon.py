@@ -1,4 +1,4 @@
-# netcon.py V3.4.1
+# netcon.py V3.4.2
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -274,7 +274,7 @@ def read_email(path_email):
     try:
         with open(path_email, "rb") as f:
             email = message_from_binary_file(f, policy=policy.default.clone(refold_source="none"))
-    except:
+    except Exception:
         raise Exception("Cannot parse email")
 
     return email
@@ -289,7 +289,7 @@ def get_config(name_list, parameters_config):
     """
     try:
         list_config = get_expression_list(name_list)
-    except:
+    except Exception:
         raise Exception("Cannot extract config")
 
     if not list_config:
@@ -297,7 +297,7 @@ def get_config(name_list, parameters_config):
 
     try:
         config = toml.loads("\n".join(list_config))
-    except:
+    except Exception:
         raise Exception("Config not valid TOML format")
 
     # discard all parameters not defined in parameters_config
@@ -525,7 +525,7 @@ def scan_sophos(path_file):
 
     try:
         result = run(RUN_SOPHOS + [ path_file, ], check=True, stdout=PIPE, stderr=DEVNULL, encoding=CHARSET_UTF8)
-    except:
+    except Exception:
         raise Exception("Error calling Sophos AV")
 
     match = re.search(r"\n\tSophosConnection::recvLine returning VIRUS (\S+) {}\n".format(path_file), result.stdout)
@@ -546,7 +546,7 @@ def scan_kaspersky(path_file):
 
     try:
         result = run(RUN_KASPERSKY + [ path_file, ], check=True, stdout=PIPE, stderr=DEVNULL, encoding=CHARSET_UTF8)
-    except:
+    except Exception:
         raise Exception("Error calling Kaspersky AV")
 
     match = re.search(r"\n'{}': EVENT_DETECT '([^']+)'. Detect type: ".format(path_file), result.stdout)
@@ -597,7 +597,7 @@ def scan_avira(path_file):
             s.send(b"SCAN " + path_file.encode(CHARSET_UTF8) + b"\n")
 
             data = s.recv(BUFFER_TCP)
-    except:
+    except Exception:
         raise Exception("Error calling Avira AV")
 
     match = re.search(r"^310 [^;]*?(\S+) ;", data.decode(CHARSET_UTF8))
@@ -617,7 +617,7 @@ def domain_blacklisted(domain):
     for reputation in LIST_REPUTATION:
         try:
             set_result = { str(item) for item in resolve("{}.{}".format(domain, reputation.query_domain), reputation.record_type).rrset.items }
-        except:
+        except Exception:
             set_result = set()
 
         if len(set_result) == 1 and re.search(reputation.match, set_result.pop()):
