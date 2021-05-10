@@ -1,4 +1,4 @@
-# netcon.py V3.4.2
+# netcon.py V3.5.0
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -34,6 +34,7 @@ LIST_REPUTATION = [
 
 CHARSET_EQUIVALENT = {
     "windows-31j": "cp932",
+    "windows-874": "cp874",
 }
 
 @enum.unique
@@ -113,33 +114,36 @@ class HandlerValue(HandlerBase):
         :type regex_list: str
         :type regex_item: str
         """
-        self.add_item = False
+        self.name_list = None
+        self.item = None
 
         super().__init__(tag_table, tag_list, tag_item, regex_list, regex_item)
 
     def startElement(self, name, attrs):
-        if not self.add_item:
-            if name == self.tag_list and "name" in attrs:
-                name_list = attrs["name"]
+        if self.name_list is not None and name == self.tag_item:
+            self.item = ""
+        elif name == self.tag_list and "name" in attrs:
+            name_list = attrs["name"]
 
-                if re.search(self.pattern_list, name_list):
-                    self.name_list = name_list
-            elif self.name_list is not None and name == self.tag_item:
+            if re.search(self.pattern_list, name_list):
+                self.name_list = name_list
+
                 self.list_item = list()
-                self.add_item = True
 
     def characters(self, content):
-        if self.add_item:
-            if re.search(self.pattern_item, content):
-                self.list_item.append(content)
+        if self.item is not None:
+            self.item += content
 
     def endElement(self, name):
-        if name == self.tag_list and self.add_item:
+        if self.name_list is not None and name == self.tag_item and re.search(self.pattern_item, self.item):
+                self.list_item.append(self.item)
+
+                self.item = None
+        elif name == self.tag_list and self.name_list is not None:
             if self.list_item:
                 self.list_itemlist.append(( self.name_list, self.list_item ))
 
             self.name_list = None
-            self.add_item = False
         elif name == self.tag_table:
             raise SAXExceptionFinished
 
