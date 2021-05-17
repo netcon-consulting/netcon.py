@@ -1,4 +1,4 @@
-# netcon.py V3.5.0
+# netcon.py V3.6.0
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -23,6 +23,8 @@ from dns.resolver import resolve
 
 CHARSET_UTF8 = "utf-8"
 BUFFER_TCP = 4096 # in bytes
+
+PATTERN_PROTOCOL = re.compile(r"^(https?://)(\S+)$", re.IGNORECASE)
 
 TupleReputation = namedtuple("TupleReputation", "query_domain record_type match")
 
@@ -643,3 +645,26 @@ def python_charset(charset):
             return CHARSET_EQUIVALENT[lower]
 
     return charset
+
+def url2regex(url):
+    """
+    Convert CS URL list entry to regex.
+
+    :type url: str
+    :rtype: str
+    """
+    match = re.search(PATTERN_PROTOCOL, url)
+
+    if match is None:
+        protocol = r"(https?://)?"
+    else:
+        protocol = match.group(1)
+
+        url = match.group(2)
+
+    split_url = url.split("/")
+
+    if len(split_url) == 2 and split_url[1] == "*":
+        return r"^{}{}/?.*$".format(protocol, re.escape(split_url[0]).replace("\\*", ".*"))
+    else:
+        return r"^{}{}$".format(protocol, re.escape(url).replace("\\*", ".*"))
