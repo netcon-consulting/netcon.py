@@ -1,4 +1,4 @@
-# netcon.py V3.6.0
+# netcon.py V4.0.0
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -54,17 +54,22 @@ class ParserArgs(argparse.ArgumentParser):
     """
     Argument parser for input and log files and config name.
     """
-    def __init__(self, description, config=False):
+    def __init__(self, description, arg_config, arg_type):
         """
         :type description: str
-        :type config: bool
+        :type arg_config: bool
+        :type arg_type: bool
         """
         super().__init__(description=description)
 
         self.add_argument("input", metavar="INPUT", type=str, help="input file")
         self.add_argument("log", metavar="LOG", type=str, help="log file")
-        if config:
+
+        if arg_config:
             self.add_argument("config", metavar="CONFIG", type=str, help="name of config lexical list")
+
+        if arg_type:
+            parser.add_argument("type", metavar="TYPE", type=str, help="message part type")
 
 class SAXExceptionFinished(SAXException):
     """
