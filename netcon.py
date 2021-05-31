@@ -1,4 +1,4 @@
-# netcon.py V4.0.0
+# netcon.py V4.0.1
 #
 # Copyright (c) 2020-2021 NetCon Unternehmensberatung GmbH, https://www.netcon-consulting.com
 # Author: Marc Dierksen (m.dierksen@netcon-consulting.com)
@@ -69,7 +69,7 @@ class ParserArgs(argparse.ArgumentParser):
             self.add_argument("config", metavar="CONFIG", type=str, help="name of config lexical list")
 
         if arg_type:
-            parser.add_argument("type", metavar="TYPE", type=str, help="message part type")
+            self.add_argument("type", metavar="TYPE", type=str, help="message part type")
 
 class SAXExceptionFinished(SAXException):
     """
